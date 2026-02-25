@@ -419,73 +419,74 @@
         const thinkingEl = showThinkingAnimation();
         
         try {
-            // 简单的本地处理逻辑
-            let response = '';
+            // 准备API请求数据
+            const requestData = {
+                model: "doubao-pro", // 根据实际模型名称调整
+                messages: [
+                    {
+                        role: "system",
+                        content: `你是一位专业的MD Codes™面部美学治疗顾问。请根据用户提供的患者症状和需求，结合以下MD Codes数据，生成专业的治疗方案：
+                        
+                        ${JSON.stringify(mdCodesData, null, 2)}
+                        
+                        治疗方案应包括推荐的MD Codes组合、注射层次、剂量和安全注意事项。`
+                    },
+                    {
+                        role: "user",
+                        content: query
+                    }
+                ],
+                temperature: 0.7,
+                max_tokens: 1000
+            };
             
-            // 检查是否是关于特定MD Code的问题
-            const codeMatch = query.match(/(Ck|T|C|Jw|F|Tt|NL|Lp)\d+/);
-            if (codeMatch) {
-                const codeId = codeMatch[0];
-                let codeInfo = null;
-                
-                // 查找代码信息
-                for (const group in mdCodesData) {
-                    for (const area in mdCodesData[group]) {
-                        const found = mdCodesData[group][area].find(c => c.id === codeId);
-                        if (found) {
-                            codeInfo = found;
-                            break;
-                        }
-                    }
-                    if (codeInfo) break;
-                }
-                
-                if (codeInfo) {
-                    response = `
-                        <p><strong>${codeInfo.id} - ${codeInfo.name}</strong></p>
-                        <p><strong>目标层次:</strong> ${codeInfo.depth}</p>
-                        <p><strong>注射工具:</strong> ${codeInfo.device}</p>
-                        <p><strong>注射方式:</strong> ${codeInfo.delivery}</p>
-                        <p><strong>活性剂量 (单侧):</strong> ${codeInfo.activeNumber}</p>
-                    `;
-                    
-                    if (codeInfo.isAlert) {
-                        response += `<p class="text-red-600"><strong>安全警示:</strong> ${codeInfo.alertInfo}</p>`;
-                    }
-                } else {
-                    response = `抱歉，我找不到关于 ${codeId} 的信息。请确认代码是否正确。`;
-                }
-            } 
-            // 检查是否是治疗方案请求
-            else if (query.includes('治疗') || query.includes('方案') || query.includes('建议')) {
-                // 这里可以根据问题内容生成简单的治疗方案
-                response = "我可以帮你生成治疗方案。为了给你更准确的建议，请告诉我患者的具体情况，例如:";
-                response += "<ul class='list-disc list-inside text-xs mt-1'>";
-                response += "<li>患者的主要问题（如看起来疲惫、悲伤、面部松弛等）</li>";
-                response += "<li>年龄和皮肤状况</li>";
-                response += "<li>期望的治疗效果</li>";
-                response += "</ul>";
-                response += "<p>提供这些信息后，我可以为你生成更个性化的MD Codes™治疗方案。</p>";
-            } 
-            // 一般问题
-            else {
-                // 这里可以添加更多简单的问答逻辑
-                response = "我是豆包AI，专门为你提供关于MD Codes™的信息和治疗建议。你可以问我关于特定代码的信息，或者请求生成治疗方案。";
+            // 调用AI API
+            const response = await fetch(AI_API_ENDPOINT, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${AI_API_KEY}`
+                },
+                body: JSON.stringify(requestData)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`API请求失败: ${response.status}`);
             }
             
+            const result = await response.json();
+            const aiResponse = result.choices[0].message.content;
+            
             // 模拟AI思考时间
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            await new Promise(resolve => setTimeout(resolve, 500));
             
             // 移除思考动画
             removeThinkingAnimation(thinkingEl);
             
             // 添加AI回复
-            addMessage(response, false);
+            addMessage(aiResponse, false);
+            
+            // 如果是治疗方案请求，尝试解析并显示结构化方案
+            if (query.includes('治疗') || query.includes('方案') || query.includes('建议')) {
+                try {
+                    // 尝试从AI响应中提取JSON数据
+                    const jsonStart = aiResponse.indexOf('{');
+                    const jsonEnd = aiResponse.lastIndexOf('}') + 1;
+                    if (jsonStart !== -1 && jsonEnd !== -1) {
+                        const planJson = aiResponse.substring(jsonStart, jsonEnd);
+                        const planData = JSON.parse(planJson);
+                        displayAiPlan(planData);
+                        openModal('aiPlanModal');
+                    }
+                } catch (e) {
+                    console.log("无法解析为结构化方案，显示纯文本响应");
+                }
+            }
             
         } catch (error) {
             console.error("Error handling doubao query:", error);
             removeThinkingAnimation(thinkingEl);
-            addMessage("抱歉，我在处理你的问题时遇到了困难。请稍后再试。", false);
+            addMessage("抱歉，AI服务暂时不可用。请检查API配置或稍后再试。", false);
         }
     }
 
