@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交互式 MD Codes™ 参考图谱 (豆包AI增强版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Microsoft YaHei', sans-serif;
+            background-color: #f8fafc;
+        }
+        .main-container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 1.5rem;
+            height: calc(100vh - 4rem);
+        }
+        @media (max-width: 1024px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+        }
+        .sidebar {
+            background-color: white;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .content {
+            background-color: white;
+            border-radius: 0.75rem;
+            padding: 2rem;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .code-item {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+        }
+        .code-item.active, .code-item:hover {
+            background-color: #eef2ff;
+            color: #4f46e5;
+        }
+        .code-item.is-alert {
+            color: #dc2626;
+        }
+        .code-item.is-alert:hover {
+            background-color: #fee2e2;
+            color: #b91c1c;
+        }
+        .code-item.is-alert.active {
+             background-color: #fecaca;
+             color: #991b1b;
+        }
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        .detail-card {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 50;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: #fff;
+            margin: auto;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .modal.active {
+            display: flex;
+        }
+        .tab-btn.active {
+            color: #4f46e5;
+            border-color: #4f46e5;
+        }
+        /* 豆包AI特有样式 */
+        .doubao-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #f97316;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        .doubao-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .doubao-chat-container {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+        .doubao-message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            max-width: 80%;
+        }
+        .doubao-message.user {
+            background-color: #eef2ff;
+            color: #4f46e5;
+            margin-left: auto;
+        }
+        .doubao-message.bot {
+            background-color: #fef3c7;
+            color: #92400e;
+            margin-right: auto;
+            display: flex;
+        }
+        .doubao-message.bot .avatar {
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+        .doubao-typing {
+            display: inline-block;
+            overflow: hidden;
+            white-space: nowrap;
+            animation: typing 3.5s steps(40, end);
+        }
+        @keyframes typing {
+            from { width: 0 }
+            to { width: 100% }
+        }
+        .doubao-dot-pulse {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #92400e;
+            margin: 0 2px;
+            animation: pulse 1.4s infinite ease-in-out both;
+        }
+        .doubao-dot-pulse:nth-child(1) { animation-delay: -0.32s; }
+        .doubao-dot-pulse:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes pulse {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+        .doubao-thinking {
+            display: flex;
+            align-items: center;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-6">
+
+    <header class="mb-4">
+        <h1 class="text-3xl font-bold text-gray-800">交互式 MD Codes™ 参考图谱 (豆包AI增强版)</h1>
+        <p class="text-gray-500 mt-1">基于 Maurício de Maio 博士的学术文献创建，并由豆包AI提供智能支持。</p>
+    </header>
+
+    <div class="main-container">
+        <!-- Sidebar for navigation -->
+        <aside class="sidebar">
+            <h2 class="text-xl font-bold text-gray-700 mb-4">导航</h2>
+            <div id="navigation" class="space-y-6">
+                <!-- Navigation sections will be injected by JS -->
+            </div>
+            <div class="mt-8">
+                <h3 class="font-semibold text-gray-700 mb-2">治疗算法</h3>
+                <div class="space-y-2">
+                    <button onclick="openModal('saggyCheekModal')" class="w-full text-left bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-2 px-4 rounded-lg transition">面颊松弛/容量缺失</button>
+                    <button onclick="openModal('sunkenTempleModal')" class="w-full text-left bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-2 px-4 rounded-lg transition">太阳穴凹陷</button>
+                </div>
+            </div>
+             <!-- 豆包AI Section -->
+            <div class="mt-8 pt-8 border-t border-gray-200">
+                <div class="doubao-header">
+                    <div class="doubao-avatar">豆</div>
+                    <h3 class="font-semibold text-gray-700">豆包AI助手</h3>
+                </div>
+                <p class="text-sm text-gray-500 mb-4">我是你的AI助手，可以帮你解答关于MD Codes™的问题，或根据患者情况生成治疗方案建议。</p>
+                
+                <div id="doubao-chat" class="doubao-chat-container">
+                    <!-- 豆包AI欢迎信息 -->
+                    <div class="doubao-message bot">
+                        <div class="avatar">
+                            <div class="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold">豆</div>
+                        </div>
+                        <div>
+                            <p>你好！我是豆包AI，很高兴为你提供帮助。</p>
+                            <p>你可以问我任何关于MD Codes™的问题，比如:</p>
+                            <ul class="list-disc list-inside text-xs mt-1">
+                                <li>"Ck1的注射层次是什么？"</li>
+                                <li>"如何治疗看起来疲惫的患者？"</li>
+                                <li>"生成一个针对面部松弛的治疗方案"</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex">
+                    <input type="text" id="doubao-input" placeholder="请输入你的问题..." 
+                           class="flex-1 px-4 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <button id="doubao-send" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-r-lg hover:bg-indigo-700 transition">
+                        发送
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main content display -->
+        <main id="details-content" class="content">
+            <div class="text-center">
+                 <img src="https://placehold.co/600x400/EFEFEF/333333?text=MD+Codes™+示意图" alt="MD Codes™ 图谱示意图" class="mx-auto rounded-lg mb-4" id="main-image">
+                <h2 id="code-title" class="text-2xl font-bold text-gray-800">欢迎使用</h2>
+                <p id="code-description" class="mt-2 text-gray-600 max-w-2xl mx-auto">请从左侧导航栏选择一个 MD Code™ 以查看其详细信息。或使用左下角的豆包AI助手，获取智能建议。</p>
+            </div>
+            <div id="details-grid-container" class="mt-8">
+                <!-- Details grid will be injected here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="saggyCheekModal" class="modal">
+        <div class="modal-content">
+            <h3 class="text-2xl font-bold mb-4">算法: 面颊松弛/容量缺失</h3>
+            <p class="mb-4 text-gray-600">根据容量缺失的位置选择合适的 MD Codes™ 组合。</p>
+            <div class="space-y-3 text-sm">
+                <div class="p-3 bg-blue-50 border border-blue-200 rounded-md"><strong>外侧问题:</strong><ul class="list-disc list-inside mt-1 pl-2"><li>上颊: <span class="font-mono bg-blue-100 px-1 rounded">Ck1</span></li><li>下颊: <span class="font-mono bg-blue-100 px-1 rounded">Ck1 + Ck4</span></li></ul></div>
+                <div class="p-3 bg-green-50 border border-green-200 rounded-md"><strong>前方问题:</strong> <span class="font-mono bg-green-100 px-1 rounded">Ck1 + Ck2</span></div>
+                <div class="p-3 bg-purple-50 border border-purple-200 rounded-md"><strong>内侧问题:</strong><ul class="list-disc list-inside mt-1 pl-2"><li>上颊: <span class="font-mono bg-purple-100 px-1 rounded">Ck1 + Ck3</span></li><li>下颊: <span class="font-mono bg-purple-100 px-1 rounded">Ck1 + Ck3 + Ck5</span></li></ul></div>
+            </div>
+            <button onclick="closeModal('saggyCheekModal')" class="mt-6 bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition w-full">关闭</button>
+        </div>
+    </div>
+    <div id="sunkenTempleModal" class="modal">
+        <div class="modal-content">
+            <h3 class="text-2xl font-bold mb-4">算法: 太阳穴凹陷</h3>
+            <p class="mb-4 text-gray-600">根据太阳穴凹陷的严重程度选择治疗方案。</p>
+             <div class="space-y-3">
+                <div class="p-3 bg-gray-100 border rounded-md"><strong>轻度/中度:</strong> <span class="font-mono bg-gray-200 px-1 rounded">T1</span></div>
+                <div class="p-3 bg-gray-100 border rounded-md"><strong>重度:</strong> <span class="font-mono bg-gray-200 px-1 rounded">T1 + T2</span></div>
+                <div class="p-3 bg-red-50 border border-red-200 rounded-md"><strong>骨骼化:</strong> <span class="font-mono bg-red-100 px-1 rounded">T1 + T2 (骨骼)</span> 和 <span class="font-mono bg-red-100 px-1 rounded">T1/T2 (筋膜)</span></div>
+            </div>
+            <button onclick="closeModal('sunkenTempleModal')" class="mt-6 bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition w-full">关闭</button>
+        </div>
+    </div>
+    <!-- AI Plan Modal -->
+    <div id="aiPlanModal" class="modal">
+        <div class="modal-content !max-w-3xl">
+            <div class="flex justify-between items-start">
+                <h3 class="text-2xl font-bold mb-2">豆包AI生成的治疗方案建议</h3>
+                <button onclick="closeModal('aiPlanModal')" class="text-2xl font-light text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            
+            <div class="border-b border-gray-200">
+                <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                    <button id="tab-clinical" onclick="switchTab('clinical')" class="tab-btn active whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">临床方案</button>
+                    <button id="tab-patient" onclick="switchTab('patient')" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent">患者沟通</button>
+                </nav>
+            </div>
+
+            <div id="ai-plan-output" class="mt-6">
+                <div id="content-clinical"></div>
+                <div id="content-patient" class="hidden"></div>
+            </div>
+            <div id="ai-error" class="hidden mt-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-lg">
+                <h4 class="font-bold">生成失败</h4>
+                <p>无法连接到AI服务或返回了无效的数据。请稍后再试。</p>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- Data based on the provided paper ---
+    const mdCodesData = {
+        'Foundation': {'Cheek (Ck)': [{ id: 'Ck1', name: '颧弓', depth: '骨膜上', device: '针头', delivery: '三个锚定点团注', activeNumber: '0.1+0.1+0.1 mL', isAlert: false },{ id: 'Ck2', name: '颧突', depth: '骨膜上', device: '针头', delivery: '团注', activeNumber: '0.2 mL', isAlert: true, alertInfo: '注意颧面动脉' },{ id: 'Ck3', name: '前内侧面颊', depth: '骨膜上/深层苹果肌脂肪垫/SOOF', device: '针头/钝针', delivery: '团注/扇形注射', activeNumber: '0.3-0.5 mL', isAlert: true, alertInfo: '注意眶下动脉' },{ id: 'Ck4', name: '下面颊外侧/腮腺区', depth: '皮下', device: '钝针', delivery: '扇形注射', activeNumber: '0.5 mL', isAlert: true, alertInfo: '注意腮腺' },{ id: 'Ck5', name: '颧下/颊区', depth: '皮下', device: '钝针', delivery: '扇形注射', activeNumber: '0.5 mL', isAlert: true, alertInfo: '注意颊神经、面静脉和动脉' }]},
+        'Contour': {'Upper Face: Temple (T)': [{ id: 'T1', name: '前太阳穴', depth: '骨膜上/颞筋膜', device: '针头/钝针', delivery: '团注/扇形注射', activeNumber: '0.5 mL', isAlert: false },{ id: 'T2', name: '后太阳穴', depth: '骨膜上', device: '针头', delivery: '团注', activeNumber: '0.5 mL', isAlert: true, alertInfo: '注意颞浅动脉和颞深动脉' }],'Lower Face: Chin (C)': [{ id: 'C1', name: '唇颏沟角', depth: '皮下', device: '钝针', delivery: '扇形注射', activeNumber: '0.5 mL', isAlert: false },{ id: 'C2', name: '下巴尖', depth: '皮下/骨膜上', device: '钝针/针头', delivery: '扇形注射/团注', activeNumber: '0.3 mL', isAlert: false },{ id: 'C3', name: '前下巴', depth: '骨膜上', device: '针头', delivery: '团注', activeNumber: '0.3 mL', isAlert: true, alertInfo: '不要太靠外侧以免触及颏动脉' },{ id: 'C4', name: '前下巴/软组织颏前点', depth: '皮下', device: '针头', delivery: '团注', activeNumber: '0.3 mL (仅中线)', isAlert: false },{ id: 'C5', name: '下巴外侧下方', depth: '骨膜上', device: '针头', delivery: '团注', activeNumber: '0.3 mL', isAlert: false },{ id: 'C6', name: '下巴外侧', depth: '皮下', device: '钝针', delivery: '扇形注射', activeNumber: '0.5 mL', isAlert: false }],'Lower Face: Jowls (Jw)': [{ id: 'Jw1', name: '下颌角', depth: '骨膜上/皮下', device: '针头/钝针', delivery: '团注/扇形注射', activeNumber: '0.5 mL', isAlert: false },{ id: 'Jw2', name: '耳前区', depth: '皮下', device: '钝针', delivery: '扇形注射', activeNumber: '0.5 mL', isAlert: true, alertInfo: '注意腮腺' },{ id: 'Jw3', name: '下颌体', depth: '皮下', device: '钝针', delivery: '线性注射', activeNumber: '1.0 mL', isAlert: true, alertInfo: '注意颞浅动脉和腮腺' },{ id: 'Jw4', name: '下颌前腮区', depth: '皮下', device: '钝针', delivery: '扇形注射', activeNumber: '0.5 mL', isAlert: false },{ id: 'Jw5', name: '前下巴下方', depth: '皮下', device: '钝针', delivery: '扇形注射', activeNumber: '0.5 mL', isAlert: false }]},
+        'Refinement': {'Periorbital: Forehead (F)': [{ id: 'F1', name: '内侧额头', depth: '骨膜上', device: '钝针', delivery: '扇形注射', activeNumber: '0.5 mL', isAlert: true, alertInfo: '注意眶上动脉。高级技巧，仅限专家。' },{ id: 'F2', name: '外侧额头', depth: '骨膜上', device: '钝针', delivery: '扇形注射', activeNumber: '0.5 mL', isAlert: true, alertInfo: '注意颞浅动脉。高级技巧，仅限专家。' },{ id: 'F3', name: '中央额头', depth: '骨膜上', device: '钝针', delivery: '扇形注射', activeNumber: '0.5 mL', isAlert: true, alertInfo: '注意滑车上动脉。高级技巧，仅限专家。' }],'Periorbital: Tear Trough (Tt)': [{ id: 'Tt1', name: '眶下中央', depth: '骨膜上', device: '钝针', delivery: '等分注射', activeNumber: '0.2 mL', isAlert: true, alertInfo: '注意眶下动脉分支。仅限受过专门训练的专家。' },{ id: 'Tt2', name: '眶下外侧', depth: '骨膜上', device: '钝针', delivery: '等分注射', activeNumber: '0.2 mL', isAlert: true, alertInfo: '仅限受过专门训练的专家。' },{ id: 'Tt3', name: '眶下内侧', depth: '骨膜上', device: '钝针', delivery: '等分注射', activeNumber: '0.1 mL', isAlert: true, alertInfo: '注意内眦动脉和静脉。仅限受过专门训练的专家。' }],'Perioral: Nasolabial Fold (NL)': [{ id: 'NL1', name: '上鼻唇沟', depth: '骨膜上/皮下', device: '针头/钝针', delivery: '团注/扇形注射', activeNumber: '0.3-0.5 mL', isAlert: true, alertInfo: '注意面动脉及其鼻翼分支' },{ id: 'NL2', name: '中鼻唇沟', depth: '皮下', device: '钝针', delivery: '扇形注射', activeNumber: '0.2-0.3 mL', isAlert: true, alertInfo: '注意面动脉' },{ id: 'NL3', name: '下鼻唇沟', depth: '皮下', device: '钝针', delivery: '扇形注射', activeNumber: '0.2 mL', isAlert: true, alertInfo: '注意面动脉' }],'Perioral: Lips (Lp)': [{ id: 'Lp1', name: '唇红体', depth: '黏膜下', device: '钝针', delivery: '线性注射', activeNumber: '0.2 mL (上/下)', isAlert: false },{ id: 'Lp2', name: '丘比特弓', depth: '黏膜', device: '针头', delivery: '微量等分注射', activeNumber: '0.05 mL', isAlert: false },{ id: 'Lp3', name: '唇缘', depth: '黏膜', device: '针头', delivery: '线性注射', activeNumber: '0.15 mL (上/下)', isAlert: false },{ id: 'Lp6', name: '口角', depth: '黏膜', device: '针头', delivery: '等分注射', activeNumber: '0.1 mL', isAlert: false }]}
+    };
+
+    const navigationEl = document.getElementById('navigation');
+    const detailsContentEl = document.getElementById('details-content');
+    const codeTitleEl = document.getElementById('code-title');
+    const codeDescriptionEl = document.getElementById('code-description');
+    const detailsGridContainerEl = document.getElementById('details-grid-container');
+    const aiErrorEl = document.getElementById('ai-error');
+    const contentClinicalEl = document.getElementById('content-clinical');
+    const contentPatientEl = document.getElementById('content-patient');
+    const tabClinicalBtn = document.getElementById('tab-clinical');
+    const tabPatientBtn = document.getElementById('tab-patient');
+    
+    // 豆包AI元素
+    const doubaoChatEl = document.getElementById('doubao-chat');
+    const doubaoInputEl = document.getElementById('doubao-input');
+    const doubaoSendBtn = document.getElementById('doubao-send');
+
+    function createNavigation() {
+        let html = '';
+        for (const group in mdCodesData) {
+            html += `<div class="mb-4"><h3 class="text-lg font-semibold text-indigo-700 mb-3">${group}</h3><div class="space-y-2">`;
+            for (const area in mdCodesData[group]) {
+                html += `<div><p class="text-md font-medium text-gray-600 mb-1">${area}</p><ul class="border-l-2 border-gray-200 pl-3 space-y-1">`;
+                mdCodesData[group][area].forEach(code => {
+                    html += `<li><div onclick="showCodeDetails('${code.id}')" class="code-item ${code.isAlert ? 'is-alert' : ''}" id="nav-${code.id}"><span class="font-mono font-semibold">${code.id}</span> - ${code.name}</div></li>`;
+                });
+                html += `</ul></div>`;
+            }
+            html += `</div></div>`;
+        }
+        navigationEl.innerHTML = html;
+    }
+
+    function showCodeDetails(codeId) {
+        let selectedCode = null;
+        for (const group in mdCodesData) {
+            for (const area in mdCodesData[group]) {
+                const found = mdCodesData[group][area].find(c => c.id === codeId);
+                if (found) { selectedCode = found; break; }
+            }
+            if (selectedCode) break;
+        }
+        if (!selectedCode) return;
+        document.querySelectorAll('.code-item').forEach(el => el.classList.remove('active'));
+        document.getElementById(`nav-${codeId}`).classList.add('active');
+        codeTitleEl.textContent = `${selectedCode.id} - ${selectedCode.name}`;
+        let descriptionText = `解剖区域: ${Object.entries(mdCodesData).flatMap(([group, areas]) => Object.entries(areas).map(([area, codes]) => codes.some(c => c.id === codeId) ? area : null)).find(Boolean)}`;
+        codeDescriptionEl.textContent = descriptionText;
+        document.getElementById('main-image').style.display = 'none';
+        detailsGridContainerEl.innerHTML = `<div class="details-grid"><div class="detail-card"><h4 class="font-semibold text-gray-700 mb-1">目标层次</h4><p class="text-gray-900">${selectedCode.depth}</p></div><div class="detail-card"><h4 class="font-semibold text-gray-700 mb-1">注射工具</h4><p class="text-gray-900">${selectedCode.device}</p></div><div class="detail-card"><h4 class="font-semibold text-gray-700 mb-1">注射方式</h4><p class="text-gray-900">${selectedCode.delivery}</p></div><div class="detail-card"><h4 class="font-semibold text-gray-700 mb-1">活性剂量 (单侧)</h4><p class="text-gray-900 font-mono">${selectedCode.activeNumber}</p></div></div>${selectedCode.isAlert ? `<div class="mt-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-lg"><h4 class="font-bold">安全警示</h4><p>${selectedCode.alertInfo || '此区域存在重要的神经血管结构，需要格外小心。'}</p></div>` : ''}`;
+    }
+
+    // Modal functions
+    function openModal(modalId) { document.getElementById(modalId).classList.add('active'); }
+    function closeModal(modalId) { document.getElementById(modalId).classList.remove('active'); }
+    window.onclick = function(event) {
+        const modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => { if (event.target == modal) { modal.classList.remove('active'); } });
+    }
+
+    // --- 豆包AI Functions ---
+    function addMessage(text, isUser) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `doubao-message ${isUser ? 'user' : 'bot'}`;
+        
+        if (isUser) {
+            messageDiv.textContent = text;
+        } else {
+            messageDiv.innerHTML = `
+                <div class="avatar">
+                    <div class="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold">豆</div>
+                </div>
+                <div>${text}</div>
+            `;
+        }
+        
+        doubaoChatEl.appendChild(messageDiv);
+        doubaoChatEl.scrollTop = doubaoChatEl.scrollHeight;
+    }
+
+    function showThinkingAnimation() {
+        const thinkingDiv = document.createElement('div');
+        thinkingDiv.className = 'doubao-message bot doubao-thinking';
+        thinkingDiv.innerHTML = `
+            <div class="avatar">
+                <div class="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold">豆</div>
+            </div>
+            <div>
+                <div class="doubao-dot-pulse"></div>
+                <div class="doubao-dot-pulse"></div>
+                <div class="doubao-dot-pulse"></div>
+            </div>
+        `;
+        
+        doubaoChatEl.appendChild(thinkingDiv);
+        doubaoChatEl.scrollTop = doubaoChatEl.scrollHeight;
+        return thinkingDiv;
+    }
+
+    function removeThinkingAnimation(thinkingEl) {
+        if (thinkingEl && thinkingEl.parentNode) {
+            thinkingEl.parentNode.removeChild(thinkingEl);
+        }
+    }
+
+    async function handleDoubaoQuery(query) {
+        if (!query.trim()) return;
+        
+        // 添加用户消息
+        addMessage(query, true);
+        
+        // 显示思考动画
+        const thinkingEl = showThinkingAnimation();
+        
+        try {
+            // 简单的本地处理逻辑
+            let response = '';
+            
+            // 检查是否是关于特定MD Code的问题
+            const codeMatch = query.match(/(Ck|T|C|Jw|F|Tt|NL|Lp)\d+/);
+            if (codeMatch) {
+                const codeId = codeMatch[0];
+                let codeInfo = null;
+                
+                // 查找代码信息
+                for (const group in mdCodesData) {
+                    for (const area in mdCodesData[group]) {
+                        const found = mdCodesData[group][area].find(c => c.id === codeId);
+                        if (found) {
+                            codeInfo = found;
+                            break;
+                        }
+                    }
+                    if (codeInfo) break;
+                }
+                
+                if (codeInfo) {
+                    response = `
+                        <p><strong>${codeInfo.id} - ${codeInfo.name}</strong></p>
+                        <p><strong>目标层次:</strong> ${codeInfo.depth}</p>
+                        <p><strong>注射工具:</strong> ${codeInfo.device}</p>
+                        <p><strong>注射方式:</strong> ${codeInfo.delivery}</p>
+                        <p><strong>活性剂量 (单侧):</strong> ${codeInfo.activeNumber}</p>
+                    `;
+                    
+                    if (codeInfo.isAlert) {
+                        response += `<p class="text-red-600"><strong>安全警示:</strong> ${codeInfo.alertInfo}</p>`;
+                    }
+                } else {
+                    response = `抱歉，我找不到关于 ${codeId} 的信息。请确认代码是否正确。`;
+                }
+            } 
+            // 检查是否是治疗方案请求
+            else if (query.includes('治疗') || query.includes('方案') || query.includes('建议')) {
+                // 这里可以根据问题内容生成简单的治疗方案
+                response = "我可以帮你生成治疗方案。为了给你更准确的建议，请告诉我患者的具体情况，例如:";
+                response += "<ul class='list-disc list-inside text-xs mt-1'>";
+                response += "<li>患者的主要问题（如看起来疲惫、悲伤、面部松弛等）</li>";
+                response += "<li>年龄和皮肤状况</li>";
+                response += "<li>期望的治疗效果</li>";
+                response += "</ul>";
+                response += "<p>提供这些信息后，我可以为你生成更个性化的MD Codes™治疗方案。</p>";
+            } 
+            // 一般问题
+            else {
+                // 这里可以添加更多简单的问答逻辑
+                response = "我是豆包AI，专门为你提供关于MD Codes™的信息和治疗建议。你可以问我关于特定代码的信息，或者请求生成治疗方案。";
+            }
+            
+            // 模拟AI思考时间
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            // 移除思考动画
+            removeThinkingAnimation(thinkingEl);
+            
+            // 添加AI回复
+            addMessage(response, false);
+            
+        } catch (error) {
+            console.error("Error handling doubao query:", error);
+            removeThinkingAnimation(thinkingEl);
+            addMessage("抱歉，我在处理你的问题时遇到了困难。请稍后再试。", false);
+        }
+    }
+
+    function displayAiPlan(data) {
+        // Clinical Plan Tab
+        let clinicalHtml = '<div class="space-y-6">';
+        data.clinical_plan.forEach(step => {
+            clinicalHtml += `
+                <div class="p-4 border rounded-lg bg-gray-50">
+                    <h4 class="text-lg font-bold text-gray-800">${step.step_title}</h4>
+                    <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                            <p class="font-semibold text-gray-500">建议 Codes</p>
+                            <p class="font-mono text-indigo-700 mt-1">${step.codes}</p>
+                        </div>
+                        <div class="md:col-span-2">
+                            <p class="font-semibold text-gray-500">临床逻辑</p>
+                            <p class="text-gray-700 mt-1">${step.rationale}</p>
+                        </div>
+                    </div>
+                     <div class="mt-3">
+                        <p class="font-semibold text-gray-500 text-sm">预估剂量 (单侧)</p>
+                        <p class="text-gray-700 font-mono text-sm mt-1">${step.estimated_volume}</p>
+                    </div>
+                </div>
+            `;
+        });
+        clinicalHtml += '</div>';
+        contentClinicalEl.innerHTML = clinicalHtml;
+
+        // Patient Communication Tab
+        const exp = data.patient_explanation;
+        const patientHtml = `
+            <div class="space-y-4 text-gray-700 p-4 border rounded-lg bg-emerald-50 border-emerald-200">
+                <p class="font-medium">${exp.greeting}</p>
+                <div>
+                    <h5 class="font-bold text-emerald-800">我们的目标是:</h5>
+                    <p class="mt-1">${exp.goal}</p>
+                </div>
+                <div>
+                    <h5 class="font-bold text-emerald-800">我们将如何做:</h5>
+                    <p class="mt-1">${exp.process}</p>
+                </div>
+                 <div>
+                    <h5 class="font-bold text-emerald-800">期望的效果:</h5>
+                    <p class="mt-1">${exp.outcome}</p>
+                </div>
+            </div>
+        `;
+        contentPatientEl.innerHTML = patientHtml;
+        switchTab('clinical'); // Default to clinical tab
+    }
+    
+    function switchTab(tab) {
+        if (tab === 'clinical') {
+            contentClinicalEl.classList.remove('hidden');
+            contentPatientEl.classList.add('hidden');
+            tabClinicalBtn.classList.add('active');
+            tabPatientBtn.classList.remove('active');
+            tabPatientBtn.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'border-transparent');
+            
+        } else {
+            contentClinicalEl.classList.add('hidden');
+            contentPatientEl.classList.remove('hidden');
+            tabPatientBtn.classList.add('active');
+            tabClinicalBtn.classList.remove('active');
+            tabClinicalBtn.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'border-transparent');
+        }
+    }
+
+    // 豆包AI事件监听
+    doubaoSendBtn.addEventListener('click', () => {
+        const query = doubaoInputEl.value.trim();
+        if (query) {
+            handleDoubaoQuery(query);
+            doubaoInputEl.value = '';
+        }
+    });
+
+    doubaoInputEl.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            const query = doubaoInputEl.value.trim();
+            if (query) {
+                handleDoubaoQuery(query);
+                doubaoInputEl.value = '';
+            }
+        }
+    });
+
+    // Initial setup
+    createNavigation();
+</script>
+
+</body>
+</html>
